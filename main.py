@@ -33,7 +33,7 @@ dp = Dispatcher(bot)
 # Команды распознаваемые ботом
 @dp.message_handler(commands=['start'])
 async def process_start_command(message: types.Message, state: FSMContext):
-    await message.reply("Привет!\nНапиши мне что-нибудь!")
+    await message.reply(f"Привет, {message.from_user.username}!\nНапиши мне что-нибудь!")
 
 
 @dp.message_handler(commands=['help'])
@@ -67,8 +67,10 @@ async def registration(message: types.Message) -> None:
     async with AsyncClient(app=app, base_url=BASE_URL) as ac:
         payload = {
         "user_id": message.from_user.id,
-        "phone": str(message["contact"].phone_number)
+        "phone": str(message["contact"].phone_number),
+        "username": str(message.from_user.username)
         }
+
         try:
             await ac.post(USER_CREATE_URL, json=payload)
             await message.answer('Вы зарегистровались!', reply_markup=types.ReplyKeyboardRemove())
@@ -122,8 +124,10 @@ async def get_users(message: types.Message) -> None:
     """
 
     async with AsyncClient(app=app, base_url=BASE_URL) as ac:
-        users = await ac.get(GET_USERS_URL)
-        print(users.text)
+        payload ={
+            "file_path": f"users_excel/generate_excel_{message.from_user.id}_{message.message_id}.xlsx"
+        }
+        users = await ac.post(GET_USERS_URL, params=payload)
         await message.answer(users.text)
 
 

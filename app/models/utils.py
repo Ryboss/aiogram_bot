@@ -19,5 +19,6 @@ class ExcelModel(SQLModel):
     """
 
     title: str = Field(default="Excel", title="Заголовок Excel файла")
-    titles: List[Optional[str]] = Field(..., title="Названия колонок")
+    titles: List[str] = Field(..., title="Названия колонок")
     data: list = Field(..., title="Данные для генерации")
+    file_path: Optional[str] = Field(..., title="PATH для сохранения Excel")

@@ -1,17 +1,18 @@
 import logging
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
+from fastapi import APIRouter, Depends, Query, Path, HTTPException, status, Query
 from fastapi.responses import ORJSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from app.database.session import get_session
 from app.models.users import (
-    UserCreate, GetUsers
+    Users, GetUsers, ResponsUser
 )
+from app.models.utils import ExcelModel
 from app.crud import users
-from app.core.utils import sql_validation_error
+from app.core.utils import sql_validation_error, generate_json_to_excel
 
 
 log = logging.getLogger()
@@ -24,30 +25,37 @@ PERMISSION_EXCEPTION = HTTPException(status_code=status.HTTP_403_FORBIDDEN, deta
 @router.post(
     "/create",
     status_code=201,
-    response_model=UserCreate,
+    response_model=Users,
 )
 async def create_user(
-    user: UserCreate,
+    user: Users,
     session: AsyncSession = Depends(get_session)
-) -> UserCreate:
+) -> Users:
     """
     Создание пользователя
     """
-    print(user)
-    print("3333333333")
+
     return await users.create(session=session, item=user)
 
 
-@router.get(
+@router.post(
     "/get_users",
     status_code=201
 
 )
 async def get_users(
+    file_path: str = Query(..., description="PATH для сохранения Excel"),
     session: AsyncSession = Depends(get_session),
-) -> Optional[List[UserCreate]]:
+) -> Optional[List[Users]]:
     """
     Создание пользователя
     """
 
-    return await users.get_users(session=session)
+    data = await users.get_users(session=session)
+
+    titles = ["Имя пользователя", "ID Пользователя", "Телефон"]
+    result = [ExcelModel(titles=titles, title="Список пользователей", data=data, file_path=file_path)]
+
+    await generate_json_to_excel(data=result, file_path=file_path)
+
+    return

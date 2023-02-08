@@ -1,5 +1,6 @@
 import openpyxl
 import csv
+import io
 
 from typing import Any, List, Set, TypeVar, Type, Union, Callable, Generator, Iterable, Tuple, Optional, Literal
 from aiogram import types
@@ -8,8 +9,12 @@ from openpyxl.styles.borders import Border, Side, BORDER_THIN
 from openpyxl.worksheet.dimensions import DimensionHolder
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.styles.numbers import FORMAT_NUMBER, FORMAT_NUMBER_00, FORMAT_PERCENTAGE_00
+from datetime import datetime, timedelta
 
 from app.models.utils import GenericValidationError, ExcelModel
+
+MSK = timedelta(hours=3)
 
 
 def sql_validation_error(loc: List[str], type: str, msg: Optional[str] = None) -> List[dict]:
@@ -52,32 +57,72 @@ async def generate_excel(file_path: str, message: types.Message) -> str:
     return path_to_save
 
 
-async def generate_json_to_excel(data: List[ExcelModel]) -> None:
+async def generate_json_to_excel(data: List[ExcelModel], file_path: str) -> str:
     """
     Генерация Excel на основе json
     """
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
+    with io.BytesIO() as stream:
+        wb = openpyxl.Workbook()
 
-    border = Side(border_style=BORDER_THIN, color="00000000")
+        border = Side(border_style=BORDER_THIN, color="00000000")
+        data_for_excel = []
 
-    r_len = len(data)
+        r_len = len(data)
 
-    thin_border = Border(
-        top=border,
-        left=border,
-        right=border,
-        bottom=border,)
+        new_list = []
 
-    for i, sheet in enumerate(data):
-        title = sheet.title
-        titles = sheet.titles
-        data = sheet.data
+        thin_border = Border(
+            top=border,
+            left=border,
+            right=border,
+            bottom=border,)
 
-        ws: Worksheet = wb.create_sheet(f"Report{i + 1}") if r_len > 1 and i > 0 else wb.active
-        ws.title = title
+        for i, sheet in enumerate(data):
+            title = sheet.title
+            titles = sheet.titles
+            data_new = sheet.data
 
-        for i, t in enumerate(titles):
-            if t:
-                ws.cell(column=i + 1, row=2, value=t)
+            lcol = len(data_new)
+            lrow = len(titles)
+
+            ws: Worksheet = wb.create_sheet(f"Users{i + 1}") if r_len > 1 and i > 0 else wb.active
+            ws.title = title
+            dh: DimensionHolder = ws.column_dimensions  # type: ignore
+            for i, t in enumerate(titles):
+                if t:
+                    dh[get_column_letter(i + 1)].width = len(t) + 5
+                    ws.cell(column=i + 1, row=1, value=t).border = thin_border
+
+            for info in data_new:
+                for key in info.dict().values():
+                    new_list.append(key)
+
+                data_for_excel.append(new_list)
+                new_list = []
+
+            values = zip(ws.iter_rows(min_row=2, max_row=lrow + 2, min_col=1, max_col=lcol), data_for_excel)
+
+            for rows, data_row in values:
+                for cell, val in zip(rows, data_row):
+
+                    if isinstance(val, int):
+                        cell.value = val
+                        cell.number_format = FORMAT_NUMBER
+                    elif isinstance(val, float):
+                        cell.value = val
+                        cell.number_format = FORMAT_NUMBER_00
+                    elif isinstance(val, str) and val.endswith("%"):
+                        cell.value = float(val.rstrip("%"))
+                        cell.number_format = FORMAT_PERCENTAGE_00
+                    elif isinstance(val, datetime):
+                        cell.value = val + MSK  # Excel does not have timezone
+                    elif val is not None:
+                        cell.value = val
+
+
+                    cell.border = thin_border
+
+        wb.save(filename=file_path)
+        stream.seek(0)
+        return file_path
