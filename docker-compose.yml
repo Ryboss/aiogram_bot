@@ -1,0 +1,49 @@
+version: "3.7"
+services:
+  db:
+    container_name: bot_aiogram_db
+    image: postgres:13
+    ports:
+      - "5432:5432"
+    volumes:
+      - app-db-data:/var/lib/postgresql/data/pgdata
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    container_name: bot_aiogram_app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      sh -c "python3 -m alembic -c ./alembic.ini upgrade head &&
+              uvicorn main:app --host 0.0.0.0 --port 80"
+    ports:
+      - "80:80"
+    volumes:
+      - .:/code
+      # Папка с логами доступная извне докера
+      # - ./logs:/code/logs:ro
+      - type: bind
+        source: ./logs
+        target: /code/logs
+    env_file:
+      - .env
+    links:
+      - db
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  app-db-data:

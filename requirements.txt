@@ -1,0 +1,18 @@
+# Database
+alembic==1.7.*
+sqlmodel==0.0.*
+SQLAlchemy==1.4.*
+asyncpg==0.25.*
+
+# Bot
+aiogram==2.24
+
+# Fastapi
+fastapi[standart]==0.75.1
+httpx==0.23.*
+openpyxl==3.0.*
+uvicorn==0.17.*
+jose==1.0.0
+passlib==1.7.*
+starlette==0.17.*
+requests==2.27.*
