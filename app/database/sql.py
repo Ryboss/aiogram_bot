@@ -8,3 +8,11 @@ def GET_USERS() -> TextClause:
     """
 
     return text("""SELECT username, user_id, phone FROM "users" """)
+
+
+def GET_COMPANIES() -> TextClause:
+    """
+    Получение списка компаний
+    """
+
+    return text("""SELECT company_name, adress, company_phone, email FROM "companies" """)

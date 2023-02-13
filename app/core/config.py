@@ -12,6 +12,7 @@ RANDOM_IMAGE_API = config("RANDOM_IMAGE_API", cast=str)
 USER_CREATE_URL = config("USER_CREATE_URL", cast=str)
 GET_USERS_URL = config("GET_USERS_URL", cast=str)
 BASE_URL = config("BASE_URL", cast=str)
+GET_COMPANIES = config("GET_COMPANIES", cast=str)
 
 # DB
 DB_HOST = config("DB_HOST", cast=str, default="localhost")

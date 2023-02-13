@@ -6,6 +6,7 @@ asyncpg==0.25.*
 
 # Bot
 aiogram==2.24
+aiogram-calendar==0.1.*
 
 # Fastapi
 fastapi[standart]==0.75.1
@@ -16,3 +17,5 @@ jose==1.0.0
 passlib==1.7.*
 starlette==0.17.*
 requests==2.27.*
+pydantic[email]==1.8.*
+orjson==3.6.*

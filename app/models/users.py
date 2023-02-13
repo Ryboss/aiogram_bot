@@ -1,6 +1,6 @@
 from typing import Callable, Dict, List, Optional
 
-from sqlmodel import SQLModel, Field, Column, VARCHAR, INTEGER
+from sqlmodel import SQLModel, Field, Column, VARCHAR, INTEGER, ForeignKey
 
 
 class Users(SQLModel, table=True):
@@ -13,12 +13,14 @@ class Users(SQLModel, table=True):
     username: str = Field(..., title="Имя пользователя", sa_column=Column("username", VARCHAR, unique=True))
     user_id: int = Field(..., title="ID Пользователя", sa_column=Column("user_id", INTEGER, unique=True))
     phone: str = Field(..., title="Телефон пользователя", sa_column=Column("phone", VARCHAR, unique=True))
+    company: Optional[int] = Field(default=None, title="Компания", sa_column=Column("company", INTEGER, ForeignKey("companies.id", ondelete="SET NULL")))
 
     class Config:
         shema_extra = {
             "example": {
                 "user_id": 1,
-                "phone": "77777777777"
+                "phone": "77777777777",
+                "company": 3,
             },
         }
 

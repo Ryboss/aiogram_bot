@@ -9,7 +9,7 @@ from sqlmodel import SQLModel
 from sqlalchemy.engine.base import Connection
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.models import users
+from app.models import users, companies
 from app.core.config import DATABASE_URL
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

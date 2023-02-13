@@ -83,8 +83,8 @@ async def generate_json_to_excel(data: List[ExcelModel], file_path: str) -> str:
             titles = sheet.titles
             data_new = sheet.data
 
-            lcol = len(data_new)
-            lrow = len(titles)
+            lcol = len(titles)
+            lrow = len(data_new)
 
             ws: Worksheet = wb.create_sheet(f"Users{i + 1}") if r_len > 1 and i > 0 else wb.active
             ws.title = title
@@ -105,7 +105,6 @@ async def generate_json_to_excel(data: List[ExcelModel], file_path: str) -> str:
 
             for rows, data_row in values:
                 for cell, val in zip(rows, data_row):
-
                     if isinstance(val, int):
                         cell.value = val
                         cell.number_format = FORMAT_NUMBER

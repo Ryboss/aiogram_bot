@@ -3,3 +3,5 @@ __pycache__
 .env
 /download_files
 .idea
+/users_excel/
+/companies_excel/

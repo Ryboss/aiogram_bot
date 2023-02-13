@@ -2,41 +2,48 @@ import logging
 import requests
 import json
 import os
-import csv
+import asyncio
 
 from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher, FSMContext
+from aiogram_calendar import simple_cal_callback, SimpleCalendar
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.utils.callback_data import CallbackData
 
 from fastapi import FastAPI
 from httpx import AsyncClient
 from sqlalchemy.exc import IntegrityError
 
-from app.core.config import BOT_TOKEN, RANDOM_IMAGE_API, USER_CREATE_URL, BASE_URL, GET_USERS_URL
-from app.endpoints import users
-from app.core.utils import generate_excel, generate_json_to_excel
+from app.core.config import BOT_TOKEN, RANDOM_IMAGE_API, USER_CREATE_URL, BASE_URL, GET_USERS_URL, GET_COMPANIES
+from app.endpoints import users, companies
+from app.models.telegram_models import UserState, ReportsFilters
+from app.core.utils import generate_excel
+
 
 # Приложение FastApi
 app = FastAPI(title="BOT")
 
-
 # Логирование
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger()
+
 app.include_router(users.router)
+app.include_router(companies.router)
 
 
 # Подключаемся к боту по ТОКЕНУ
+storage = MemoryStorage()
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher(bot, storage=storage)
 
 
 # Команды распознаваемые ботом
-@dp.message_handler(commands=['start'])
+@dp.message_handler(commands=["start"])
 async def process_start_command(message: types.Message, state: FSMContext):
     await message.reply(f"Привет, {message.from_user.username}!\nНапиши мне что-нибудь!")
 
 
-@dp.message_handler(commands=['help'])
+@dp.message_handler(commands=["help"])
 async def process_help_command(message: types.Message):
     await message.reply("Напиши мне что-нибудь, и я отпрпавлю этот текст тебе в ответ!")
 
@@ -77,6 +84,70 @@ async def registration(message: types.Message) -> None:
         except IntegrityError as e:
             await message.answer("Такой пользователь уже существует!", reply_markup=types.ReplyKeyboardRemove())
             log.info(e.args[0])
+
+
+@dp.message_handler(commands=["get_companies"])
+async def get_companies(message: types.Message) -> None:
+    """
+    Получение компаний
+    """
+
+    async with AsyncClient(app=app, base_url=BASE_URL) as ac:
+        try:
+            payload ={
+            "file_path": f"companies_excel/generate_excel_{message.from_user.id}_{message.message_id}.xlsx"
+            }
+            companies = await ac.post(GET_COMPANIES, params=payload)
+            await message.answer_document(open(payload["file_path"], "rb"))
+        except IntegrityError as e:
+            await message.answer("Такой пользователь уже существует!", reply_markup=types.ReplyKeyboardRemove())
+            log.info(e.args[0])
+
+
+#? Получение отчета через FSMContext
+@dp.message_handler(commands=['get_report'])
+async def get_report(message: types.Message, state: FSMContext):
+    """
+    Команда для запроса отчета
+    <Выбор даты начала>
+    """
+
+    await message.answer("Выберите дату начала: ", reply_markup=await SimpleCalendar().start_calendar())
+    await ReportsFilters.date_start.set()
+
+
+@dp.callback_query_handler(simple_cal_callback.filter(), state=ReportsFilters.date_start)
+async def get_calandar_date_start(callback_query: types.CallbackQuery, callback_data: CallbackData, state: FSMContext):
+    selected, date = await SimpleCalendar().process_selection(callback_query, callback_data)
+    await state.update_data(date_start=date.strftime("%d/%m/%Y"))
+
+    if selected:
+        await callback_query.message.answer(f'Вы выбрали {date.strftime("%d/%m/%Y")}')
+
+    await callback_query.message.answer("Выберите дату конца: ", reply_markup=await SimpleCalendar().start_calendar())
+    await ReportsFilters.date_end.set()
+
+
+@dp.callback_query_handler(simple_cal_callback.filter(), state=ReportsFilters.date_end)
+async def get_calandar_date_end(callback_query: types.CallbackQuery, callback_data: CallbackData, state: FSMContext):
+    selected, date = await SimpleCalendar().process_selection(callback_query, callback_data)
+    await state.update_data(date_end=date.strftime("%d/%m/%Y"))
+
+    if selected:
+        await callback_query.message.answer(f'Вы выбрали {date.strftime("%d/%m/%Y")}')
+        await callback_query.message.answer(f"Отлично! Теперь введите название вашей компании")
+        await ReportsFilters.company.set()
+
+
+@dp.message_handler(state=ReportsFilters.company)
+async def get_date_start(message: types.Message, state: FSMContext):
+    await state.update_data(company=message.text)
+    data = await state.get_data()
+    await message.answer(f"Дата начала: {data['date_start']}\n"
+                         f"Дата конца: {data['date_end']}\n"
+                         f"Компания: {data['company']}")
+
+    await state.finish()
 
 
 @dp.message_handler(commands=["get_image"])
@@ -127,8 +198,18 @@ async def get_users(message: types.Message) -> None:
         payload ={
             "file_path": f"users_excel/generate_excel_{message.from_user.id}_{message.message_id}.xlsx"
         }
-        users = await ac.post(GET_USERS_URL, params=payload)
-        await message.answer(users.text)
+        await ac.post(GET_USERS_URL, params=payload)
+
+        await message.answer_document(open(payload["file_path"], "rb"))
+
+
+@dp.message_handler(commands=["get_id"])
+async def get_my_id(message: types.Message) -> None:
+    """
+    Получение своего ID
+    """
+
+    await message.answer(f"Ваш ID в теграме: {message.from_user.id}")
 
 
 @dp.message_handler()
@@ -139,7 +220,7 @@ async def echo_message(msg: types.Message):
 # Запускаем бота через FastApi
 @app.on_event("startup")
 async def startup() -> None:
-    await dp.start_polling()
+    asyncio.create_task(dp.start_polling())
 
 
 @app.on_event("shutdown")
